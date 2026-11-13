@@ -7,17 +7,18 @@ class DetectorPersonas:
 
     def __init__(self, modelo="yolo11n.pt", confianza=0.5):
 
-        # Cargar el modelo de inteligencia artificial
+        # Cargar el modelo YOLO
         self.modelo = YOLO(modelo)
 
-        # Nivel minimo de confianza
         self.confianza = confianza
 
     def detectar(self, frame):
 
-        # Enviar el fotograma al modelo YOLO
-        resultados = self.modelo.predict(
+        # Detectar y seguir personas
+        resultados = self.modelo.track(
             source=frame,
+            persist=True,
+            tracker="bytetrack.yaml",
             conf=self.confianza,
             classes=[0],
             verbose=False
@@ -25,19 +26,32 @@ class DetectorPersonas:
 
         detecciones = []
 
-        # Obtener las personas detectadas
+        # Obtener las cajas detectadas
         cajas = resultados[0].boxes
 
-        for caja in cajas:
+        # Obtener los identificadores
+        if cajas.id is not None:
+            identificadores = cajas.id.int().cpu().tolist()
+        else:
+            identificadores = [None] * len(cajas)
 
-            # Coordenadas del rectangulo
-            x1, y1, x2, y2 = caja.xyxy[0].cpu().numpy().astype(int)
+        for caja, identificador in zip(cajas, identificadores):
 
-            # Nivel de confianza de la deteccion
-            confianza = float(caja.conf[0].cpu().numpy())
+            # Obtener coordenadas
+            coordenadas = (
+                caja.xyxy[0]
+                .cpu()
+                .numpy()
+                .astype(int)
+            )
 
-            # Guardar la informacion
+            x1, y1, x2, y2 = coordenadas
+
+            # Obtener confianza
+            confianza = float(caja.conf[0].cpu())
+
             persona = {
+                "id": identificador,
                 "caja": (x1, y1, x2, y2),
                 "confianza": confianza
             }
@@ -48,10 +62,11 @@ class DetectorPersonas:
 
     def dibujar(self, frame, detecciones):
 
-        # Recorrer las personas detectadas
         for persona in detecciones:
 
             x1, y1, x2, y2 = persona["caja"]
+
+            identificador = persona["id"]
             confianza = persona["confianza"]
 
             # Dibujar rectangulo
@@ -63,8 +78,11 @@ class DetectorPersonas:
                 2
             )
 
-            # Mostrar etiqueta
-            texto = f"Persona: {confianza:.2f}"
+            # Preparar etiqueta
+            if identificador is not None:
+                texto = f"ID: {identificador} | {confianza:.2f}"
+            else:
+                texto = f"Persona | {confianza:.2f}"
 
             cv2.putText(
                 frame,
