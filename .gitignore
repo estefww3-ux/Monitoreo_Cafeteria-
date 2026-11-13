@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+datos/*.mp4
+datos/*.avi
+resultados/
