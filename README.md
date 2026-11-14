@@ -22,7 +22,6 @@ cd Monitoreo_Cafeteria-
 ```
 
 **Paso 2.** Crear un entorno virtual:
-
 ```powershell
 python -m venv venv
 ```
@@ -34,7 +33,6 @@ python -m venv venv
 ```
 
 **Paso 4.** Instalar las dependencias:
-
 ```powershell
 pip install -r requirements.txt
 ```
