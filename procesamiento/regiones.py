@@ -12,6 +12,8 @@ RUTA_REGIONES = Path(__file__).resolve().parent.parent / "datos" / "regiones.jso
 # Orden de prioridad al clasificar. Si dos zonas se solapan, gana la primera.
 PRIORIDAD_ZONAS = ("atencion", "espera")
 
+FUENTE_TEXTO = cv2.FONT_HERSHEY_SIMPLEX
+
 # Colores en formato BGR (así los usa OpenCV)
 COLOR_ALERTA = (0, 0, 255)  # rojo
 
@@ -44,8 +46,35 @@ def hay_solape(region_a, region_b):
     return not separados
 
 
+def _vista_calibracion(frame, regiones_hechas, titulo):
+    """
+    Prepara la imagen que verá el usuario al calibrar: el fotograma, las zonas
+    que ya dibujó (para no solaparlas) y una barra con la instrucción.
+    """
+    vista = frame.copy()
+
+    for clave, (x, y, ancho, alto) in regiones_hechas.items():
+        cv2.rectangle(vista, (x, y), (x + ancho, y + alto), ZONAS[clave]["color"], 2)
+
+    cv2.rectangle(vista, (0, 0), (vista.shape[1], 42), (30, 30, 30), -1)
+    cv2.putText(
+        vista,
+        f"Arrastra el mouse para dibujar la {titulo} y presiona ENTER",
+        (15, 29),
+        FUENTE_TEXTO,
+        0.7,
+        (255, 255, 255),
+        2,
+    )
+    return vista
+
+
 def seleccionar_regiones(frame):
-    """Pide al usuario dibujar cada zona con el mouse y guarda el resultado."""
+    """
+    Pide al usuario dibujar cada zona con el mouse y guarda el resultado.
+    Devuelve el diccionario de zonas, o None si el usuario cancela
+    (en ese caso no se modifica el archivo guardado).
+    """
     RUTA_REGIONES.parent.mkdir(parents=True, exist_ok=True)
 
     regiones = {}
@@ -54,21 +83,31 @@ def seleccionar_regiones(frame):
         titulo = datos["titulo"]
 
         while True:
-            print(
-                f"\nSelecciona la {titulo} arrastrando el mouse "
-                "y presiona ENTER (o 'c' para cancelar)."
-            )
+            print(f"\nDibuja la {titulo} con el mouse y presiona ENTER.")
 
+            vista = _vista_calibracion(frame, regiones, titulo)
             x, y, ancho, alto = cv2.selectROI(
-                titulo, frame, showCrosshair=True, fromCenter=False
+                titulo, vista, showCrosshair=True, fromCenter=False
             )
             cv2.destroyWindow(titulo)
+            cv2.waitKey(1)  # permite que Windows cierre la ventana
 
             if ancho > 0 and alto > 0:
                 regiones[clave] = [int(x), int(y), int(ancho), int(alto)]
                 break
 
-            print("No seleccionaste una región válida. Intenta nuevamente.")
+            # No se dibujó nada (ENTER sin arrastrar, 'c' o ESC): se ofrece cancelar
+            print("No dibujaste ninguna zona.")
+            try:
+                respuesta = input(
+                    "Presiona ENTER para intentar de nuevo o escribe 's' para cancelar: "
+                )
+            except EOFError:
+                respuesta = "s"
+
+            if respuesta.strip().lower() == "s":
+                print("Calibración cancelada. Se mantienen las zonas anteriores.")
+                return None
 
     # Aviso útil: las zonas solapadas hacen más difícil interpretar los tiempos
     if hay_solape(regiones["espera"], regiones["atencion"]):
@@ -130,7 +169,7 @@ def dibujar_regiones(frame, regiones, zonas_en_alerta=None):
             frame,
             datos["etiqueta"],
             (x, max(y - 10, 20)),
-            cv2.FONT_HERSHEY_SIMPLEX,
+            FUENTE_TEXTO,
             0.6,
             color,
             2,
