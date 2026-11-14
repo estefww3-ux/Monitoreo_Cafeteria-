@@ -1,5 +1,6 @@
-
 class ContadorPersonas:
+    """Cuenta las personas visibles ahora y las distintas vistas en total (por ID)."""
+
     def __init__(self):
         self.ids_observados = set()
 
@@ -14,5 +15,5 @@ class ContadorPersonas:
 
         return {
             "personas_actuales": len(ids_actuales),
-            "total_personas": len(self.ids_observados)
+            "total_personas": len(self.ids_observados),
         }
